@@ -1,0 +1,14 @@
+<?php
+/**
+ * @file
+ *   fb_comments.install
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function fbg_api_schema() {
+  $schema['cache_fbg_api'] = drupal_get_schema_unprocessed('system', 'cache');
+  $schema['cache_fbg_api']['description'] = 'Cache table for the Facebook Graph API module to store already loaded objects from facebook.';
+  return $schema;
+}
