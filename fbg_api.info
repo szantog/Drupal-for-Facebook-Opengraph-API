@@ -1,0 +1,4 @@
+name = Facebook Graph API
+description =
+package = Drupal for Facebook
+core = 7.x
