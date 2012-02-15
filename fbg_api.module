@@ -13,21 +13,21 @@
 define ('FBG_API_BASE_URL', 'https://graph.facebook.com');
 define ('FBG_APP_BASE_URL', 'http://top-memes.com');
 
-function fbg_api_init() {
-  $node = menu_get_object();
-  if (isset($node->nid)) {
-    fbg_api_get_node_comments($node);
-  }
-}
-
+/**
+ * Get data about a facebook object.
+ *
+ * @param type $args
+ *   An array of arguments to be add to graph api url, or string, in which
+ *   arguments should be separated by /
+ * @param type $params
+ *   The query string appen to url.
+ * @return type
+ *   The fetched data from url, usually an array of objects.
+ */
 function fbg_api_get_fb_object($args, $params) {
   if (is_array($args)) {
     $args = implode('/', $args);
   }
-  else {
-
-  }
-
   $url = url(FBG_API_BASE_URL . '/' . $args, array(
     'external' => TRUE,
     'absolute' => TRUE,
@@ -66,6 +66,12 @@ function fbg_api_cache_set($cid, $data) {
   return cache_set($cid, $data, 'fbg_api');
 }
 
+/**
+ * Get all facebook comment for a node, and save it into the drupal's comment
+ * system.
+ *
+ * @param $node
+ */
 function fbg_api_get_node_comments($node) {
   $comments = &drupal_static('fbg_comments', array());
 
@@ -80,6 +86,15 @@ function fbg_api_get_node_comments($node) {
   //dsm(get_defined_vars());
 }
 
+/**
+ * Append drupal data to facebook comments
+ * @param array $comments
+ *   An array of facebook comment object
+ * @param boolean $rebuild
+ *   @todo Not implemented yet,
+ * @return array
+ *   An array of drupal compatible comment object.
+ */
 function fbg_api_build_comments($comments, $rebuild = FALSE) {
   drupal_static_reset('_fbg_api_build_comment');
   foreach ($comments as $comment) {
@@ -100,7 +115,7 @@ function fbg_api_build_comments($comments, $rebuild = FALSE) {
  * @param type $comment
  * @param type $parent
  */
-function _fbg_api_build_comment(&$comment, $parent = NULL) {
+function _fbg_api_build_comment($comment, $parent = NULL) {
     $comments = &drupal_static(__FUNCTION__, array());
 
     // @todo: make this for exisiting comment to rebuild
@@ -138,6 +153,14 @@ function _fbg_api_build_comment(&$comment, $parent = NULL) {
     $comments[] = $comment;
 }
 
+/**
+ * Save multiple comments fetched by facebook api.
+ *
+ * @param array $comments
+ *   An array of facebook comment object
+ * @param object $node
+ *   The node object
+ */
 function fbg_api_save_comments($comments, $node) {
   if (!empty($comments)) {
     $parented = array();
@@ -159,10 +182,16 @@ function fbg_api_save_comments($comments, $node) {
       comment_submit($comment);
       comment_save($comment);
     }
-    dsm(get_defined_vars());
   }
 }
 
+/**
+ * Get a comment cid from comment table based on facebook comment id.
+ * @param string $fb_cid
+ *   The facebook comment id.
+ * @return
+ *   The drupal comment id if exists, or FALSE if not.
+ */
 function fbg_api_get_comment_cid_by_fb_cid($fb_cid) {
   $result = &drupal_static(__FUNCTION__);
 
