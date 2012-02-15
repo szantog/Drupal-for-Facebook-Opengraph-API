@@ -13,6 +13,13 @@
 define ('FBG_API_BASE_URL', 'https://graph.facebook.com');
 define ('FBG_APP_BASE_URL', 'http://top-memes.com');
 
+function fbg_api_init() {
+  $node = menu_get_object();
+  if (isset($node->nid)) {
+    fbg_api_get_node_comments($node);
+  }
+}
+
 function fbg_api_get_fb_object($args, $params) {
   if (is_array($args)) {
     $args = implode('/', $args);
@@ -68,14 +75,17 @@ function fbg_api_get_node_comments($node) {
 
   if ($comments = fbg_api_get_fb_object('comments', array('ids' => $url))) {
     $drupal_comments = fbg_api_build_comments($comments);
+    fbg_api_save_comments($drupal_comments, $node);
   }
-  dsm(get_defined_vars());
+  //dsm(get_defined_vars());
 }
 
-function fbg_api_build_comments($comments) {
+function fbg_api_build_comments($comments, $rebuild = FALSE) {
   drupal_static_reset('_fbg_api_build_comment');
   foreach ($comments as $comment) {
-    _fbg_api_build_comment($comment);
+    if (!fbg_api_get_comment_cid_by_fb_cid($comment->id) || $rebuild) {
+      _fbg_api_build_comment($comment);
+    }
   }
   return drupal_static('_fbg_api_build_comment');
 }
@@ -91,16 +101,36 @@ function fbg_api_build_comments($comments) {
  * @param type $parent
  */
 function _fbg_api_build_comment(&$comment, $parent = NULL) {
-    //fbg_api_convert_to_drupal_comment($comment);
     $comments = &drupal_static(__FUNCTION__, array());
 
+    // @todo: make this for exisiting comment to rebuild
+    $comment->fb_cid = $comment->id;
+    $comment->name = $comment->from->name;
+    $comment->subject = '';
+    $comment->cid = 0;
+    $comment->pid = 0;
+    $comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment->message;
+    $comment->comment_body[LANGUAGE_NONE][0]['format'] = 'filtered_html';
+    $comment->is_anonymous = TRUE;
+    $comment->uid = 0;
+    $comment->status = COMMENT_PUBLISHED;
+    $comment->date = $comment->created_time;
+
+    unset($comment->likes);
+    unset($comment->id);
+    unset($comment->from);
+    unset($comment->message);
+    unset($comment->created_time);
+
+    // This is not the real comment->pid. Need to convert to a valid drupal cid
+    // before saving.
     if (!is_null($parent)) {
-      $comment->parent = $parent;
+      $comment->pid = $parent;
     }
     if (isset($comment->comments)) {
       $subcomments = $comment->comments->data;
       foreach ($subcomments as $subcomment) {
-        _fbg_api_build_comment($subcomment, $comment->id);
+        _fbg_api_build_comment($subcomment, $comment->fb_cid);
         unset($comment->comments);
       }
     }
@@ -108,7 +138,36 @@ function _fbg_api_build_comment(&$comment, $parent = NULL) {
     $comments[] = $comment;
 }
 
-function fbg_api_comment_save($comment) {
+function fbg_api_save_comments($comments, $node) {
+  if (!empty($comments)) {
+    $parented = array();
+    foreach($comments as $comment) {
+        $comment->nid = $node->nid;
+        $comment->language = $node->language;
+        // Separate all comments, that has parent, to be sure, the parent
+        // Comment is saved before save.
+        if (($comment->pid != 0)) {
+          $parented[] = $comment;
+        }
+        else {
+          comment_submit($comment);
+          comment_save($comment);
+        }
+    }
+    foreach ($parented as $comment) {
+      $comment->pid = fbg_api_get_comment_cid_by_fb_cid($comment->pid);
+      comment_submit($comment);
+      comment_save($comment);
+    }
+    dsm(get_defined_vars());
+  }
+}
 
+function fbg_api_get_comment_cid_by_fb_cid($fb_cid) {
+  $result = &drupal_static(__FUNCTION__);
 
+  if (!isset($result[$fb_cid])) {
+    $result[$fb_cid] = db_query('SELECT * FROM {comment} WHERE fb_cid = :our_cid', array(':our_cid' => $fb_cid))->fetchField();
+  }
+  return $result[$fb_cid];
 }
