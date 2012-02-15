@@ -9,3 +9,106 @@
  *    http://szantogabor.com
  *
  */
+
+define ('FBG_API_BASE_URL', 'https://graph.facebook.com');
+define ('FBG_APP_BASE_URL', 'http://top-memes.com');
+
+function fbg_api_get_fb_object($args, $params) {
+  if (is_array($args)) {
+    $args = implode('/', $args);
+  }
+  else {
+
+  }
+
+  $url = url(FBG_API_BASE_URL . '/' . $args, array(
+    'external' => TRUE,
+    'absolute' => TRUE,
+    'https' => TRUE,
+    'query' => $params
+  ));
+  $return = fbg_api_fetch_object_data($url);
+
+
+  return $return;
+}
+
+/**
+ * The facebook api provides data as json format. This function fetch this,
+ * check, if data is paged, and walk around all page then return only 1 array
+ * @param type $url
+ */
+function fbg_api_fetch_object_data($url) {
+  $return = array();
+  $json = drupal_http_request($url);
+  if ($json->code == 200) {
+    $fetched = json_decode($json->data);
+    foreach ($fetched as $data) {
+      if (!empty($data->data)) {
+        $return +=  $data->data;
+      }
+      if (isset($data->paging->next)) {
+        fbg_api_fetch_object_data($data->paging->next);
+      }
+    }
+  }
+  return $return;
+}
+
+function fbg_api_cache_set($cid, $data) {
+  return cache_set($cid, $data, 'fbg_api');
+}
+
+function fbg_api_get_node_comments($node) {
+  $comments = &drupal_static('fbg_comments', array());
+
+  if (drupal_get_path_alias("node/$node->nid")) {
+    $url = FBG_APP_BASE_URL . url("node/$node->nid");
+  }
+
+  if ($comments = fbg_api_get_fb_object('comments', array('ids' => $url))) {
+    $drupal_comments = fbg_api_build_comments($comments);
+  }
+  dsm(get_defined_vars());
+}
+
+function fbg_api_build_comments($comments) {
+  drupal_static_reset('_fbg_api_build_comment');
+  foreach ($comments as $comment) {
+    _fbg_api_build_comment($comment);
+  }
+  return drupal_static('_fbg_api_build_comment');
+}
+
+/**
+ * Helper function to build a facebook comment object. If the comment has
+ * child comments, this is called recursive, and the child get the parent
+ * comment's id.
+ * No return value set, this only build drupal_static('fbg_api_build_comment')
+ * array.
+ *
+ * @param type $comment
+ * @param type $parent
+ */
+function _fbg_api_build_comment(&$comment, $parent = NULL) {
+    //fbg_api_convert_to_drupal_comment($comment);
+    $comments = &drupal_static(__FUNCTION__, array());
+
+    if (!is_null($parent)) {
+      $comment->parent = $parent;
+    }
+    if (isset($comment->comments)) {
+      $subcomments = $comment->comments->data;
+      foreach ($subcomments as $subcomment) {
+        _fbg_api_build_comment($subcomment, $comment->id);
+        unset($comment->comments);
+      }
+    }
+
+    $comments[] = $comment;
+}
+
+function fbg_api_comment_save($comment) {
+
+
+}
