@@ -34,10 +34,8 @@ function fbg_api_get_fb_object($args, $params) {
     'https' => TRUE,
     'query' => $params
   ));
-  $return = fbg_api_fetch_object_data($url);
 
-
-  return $return;
+  return fbg_api_fetch_object_data($url);
 }
 
 /**
@@ -59,6 +57,7 @@ function fbg_api_fetch_object_data($url) {
       }
     }
   }
+  dsm(get_defined_vars());
   return $return;
 }
 
@@ -122,7 +121,7 @@ function _fbg_api_build_comment($comment, $parent = NULL) {
     $comment->fb_cid = $comment->id;
     $comment->name = $comment->from->name;
     $comment->subject = '';
-    $comment->cid = 0;
+    $comment->cid = fbg_api_get_comment_cid_by_fb_cid($fb_cid) ? fbg_api_get_comment_cid_by_fb_cid($fb_cid) : 0;
     $comment->pid = 0;
     $comment->comment_body[LANGUAGE_NONE][0]['value'] = $comment->message;
     $comment->comment_body[LANGUAGE_NONE][0]['format'] = 'filtered_html';
